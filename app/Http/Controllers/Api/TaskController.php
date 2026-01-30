@@ -8,52 +8,100 @@ use Illuminate\Http\Request;
 
 class TaskController extends Controller
 {
-    // GET /api/tasks
+    /**
+     * GET /api/tasks
+     */
     public function index()
     {
         return response()->json(Task::all(), 200);
     }
 
-    // GET /api/tasks/{task}
-    public function show(Task $task)
+    /**
+     * GET /api/tasks/{id}
+     */
+    public function show($id)
     {
+        $task = Task::find($id);
+
+        if (! $task) {
+            return response()->json([
+                'message' => 'Task not found.'
+            ], 404);
+        }
+
         return response()->json($task, 200);
     }
 
-    // POST /api/tasks
+    /**
+     * POST /api/tasks
+     */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-        ]);
+        // 🔹 Check if title already exists
+        $exists = Task::where('title', $request->title)->exists();
 
-        $task = Task::create($validated);
+        if ($exists) {
+            return response()->json([
+                'message' => 'Title already exist'
+            ], 400);
+        }
+
+        // 🔹 Create task
+        $task = Task::create([
+            'title'       => $request->title,
+            'description' => $request->description,
+        ]);
 
         return response()->json($task, 201);
     }
 
-    // PATCH /api/tasks/{task}
-    public function update(Request $request, Task $task)
+    /**
+     * PATCH /api/tasks/{id}
+     */
+    public function update(Request $request, $id)
     {
-        $validated = $request->validate([
-            'title' => 'sometimes|string|max:255',
-            'description' => 'sometimes|nullable|string',
-            'completed' => 'sometimes|boolean',
-        ]);
+        $task = Task::find($id);
 
-        $task->update($validated);
+        if (! $task) {
+            return response()->json([
+                'message' => 'Task not found.'
+            ], 404);
+        }
+
+        // Optional: prevent duplicate title on update
+        if ($request->has('title')) {
+            $exists = Task::where('title', $request->title)
+                ->where('id', '!=', $id)
+                ->exists();
+
+            if ($exists) {
+                return response()->json([
+                    'message' => 'Title already exist'
+                ], 400);
+            }
+        }
+
+        $task->update($request->only(['title', 'description']));
 
         return response()->json($task, 200);
     }
 
-    // DELETE /api/tasks/{task}
-    public function destroy(Task $task)
+    /**
+     * DELETE /api/tasks/{id}
+     */
+    public function destroy($id)
     {
+        $task = Task::find($id);
+
+        if (! $task) {
+            return response()->json([
+                'message' => 'Task not found.'
+            ], 404);
+        }
+
         $task->delete();
 
-        return response()->json([
-            'message' => 'Task deleted successfully'
-        ], 200);
+        // 204 = No Content
+        return response()->noContent();
     }
 }
